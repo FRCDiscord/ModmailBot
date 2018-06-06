@@ -42,7 +42,10 @@ class ModmailBot(object):
         if len(content[1000:]) > 0:
             embed.add_field(name="Message (continued):", value=content[1000:])
         await channel.send(content=f"{message.author.id}", embed=embed)
-        await message.add_reaction('📬')
+        try:
+            await message.add_reaction('📬')
+        except discord.ext.commands.errors.CommandInvokeError:
+            await message.channel.send('📬')
         self.last_user = message.author
 
     async def _shutdown(self):
