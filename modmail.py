@@ -2,7 +2,7 @@ import discord
 import json
 import os
 import sys
-from discord.ext.commands import command, has_permissions, bot_has_permissions, Bot, NotOwner
+from discord.ext.commands import command, Bot
 from asyncio import sleep
 
 CONFIG_PATH = "config.json"
@@ -16,6 +16,7 @@ default_config = {
         "from_field": 1,
 }
 
+
 class ModmailBot(object):
     def __init__(self, bot, config):
         self.bot = bot
@@ -24,6 +25,7 @@ class ModmailBot(object):
 
     async def on_ready(self):
         print(f"Signed in as {self.bot.user} ({self.bot.user.id})")
+
     async def on_message(self, message):
         if not isinstance(message.channel, discord.DMChannel) or message.author.id == self.bot.user.id:
             # not a DM, or it's just the bot itself
@@ -35,7 +37,8 @@ class ModmailBot(object):
         content = message.clean_content
 
         embed = discord.Embed(title="New modmail!")
-        embed.add_field(name="Author", value=f"{message.author.mention} ({message.author.id})", inline=False)
+        embed.add_field(name="Author", value=f"{message.author.mention} ({message.author.name}) ({message.author.id})",
+                        inline=False)
         embed.add_field(name="Message", value=content[:1000] or "blank")
         if message.attachments:
             embed.add_field(name="Attachments", value=", ".join([i.url for i in message.attachments]))
@@ -69,6 +72,7 @@ class ModmailBot(object):
             await ctx.send("No user to reply to!")
             return
         await self.dm.callback(self, ctx, user=self.last_user, msg=msg)
+
     @command()
     async def reee(self, ctx, user : discord.User, times : int, *, msg):
         if ctx.author.id not in config["developers"]:
@@ -81,7 +85,6 @@ class ModmailBot(object):
                     await user.send(msg)
                 await sleep(1.25)
             await ctx.message.add_reaction('📬')
-
 
     @command()
     async def shutdown(self, ctx):
@@ -113,9 +116,11 @@ def write_config(config: dict):
     with open(CONFIG_PATH, "w") as f:
         json.dump(config, f, indent="\t")
 
+
 def read_config():
     with open(CONFIG_PATH) as f:
         return json.load(f)
+
 
 if not os.path.exists(CONFIG_PATH):
     write_config(default_config)
