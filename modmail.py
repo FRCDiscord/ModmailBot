@@ -2,7 +2,7 @@ import discord
 import json
 import os
 import sys
-from discord.ext.commands import command, Bot
+from discord.ext.commands import command, Bot, Cog
 from asyncio import sleep
 
 CONFIG_PATH = "config.json"
@@ -17,15 +17,17 @@ default_config = {
 }
 
 
-class ModmailBot(object):
+class ModmailBot(Cog):
     def __init__(self, bot, config):
         self.bot = bot
         self.config = config
         self.last_user = None
 
+    @Cog.listener("on_ready")
     async def on_ready(self):
         print(f"Signed in as {self.bot.user} ({self.bot.user.id})")
 
+    @Cog.listener("on_message")
     async def on_message(self, message):
         if not isinstance(message.channel, discord.DMChannel) or message.author.id == self.bot.user.id:
             # not a DM, or it's just the bot itself
