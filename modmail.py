@@ -9,9 +9,11 @@ CONFIG_PATH = "config.json"
 default_config = {
         "token": "[ add bot token here ]",
         "developers": [],
+        "replacements": {},
         "prefix": "^",
         "mod_role": 0,
         "blacklist": [],
+        "server": 0,
         "mail_channel": 0,
         "from_field": 1,
 }
@@ -32,26 +34,41 @@ class ModmailBot(Cog):
         if not isinstance(message.channel, discord.DMChannel) or message.author.id == self.bot.user.id:
             # not a DM, or it's just the bot itself
             return
+
         channel = self.bot.get_channel(self.config["mail_channel"])
         if not channel:
             print("Mail channel not found! Reconfigure bot!")
-        
+
+        main_guild = self.bot.get_guild(self.config["server"])
+        if not main_guild:
+            print("Main Server ID is incorrect!  Reconfigure bot!")
+            author = message.author
+        else:
+            author = main_guild.get_member(message.author.id)
+            if not author:
+                author = message.author
+
         content = message.clean_content
 
-        embed = discord.Embed(title="New modmail!")
-        embed.add_field(name="Author", value=f"{message.author.mention} ({message.author.name}) ({message.author.id})",
-                        inline=False)
+        embed = discord.Embed()
+        embed.set_author(name="{} ({}#{})".format(author.display_name, author.name, author.discriminator),
+                         icon_url=author.avatar_url)
+        embed.timestamp = message.created_at
+        embed.set_footer(text='User ID: {}'.format(author.id))
+        embed.color = author.color
+
         embed.add_field(name="Message", value=content[:1000] or "blank")
-        if message.attachments:
-            embed.add_field(name="Attachments", value=", ".join([i.url for i in message.attachments]))
         if len(content[1000:]) > 0:
-            embed.add_field(name="Message (continued):", value=content[1000:])
+            embed.add_field(name="(Continued)", value=content[1000:])
+
         await channel.send(content=f"{message.author.id}", embed=embed)
+
         try:
             await message.add_reaction('📬')
         except discord.ext.commands.errors.CommandInvokeError:
             await message.channel.send('📬')
-        self.last_user = message.author
+
+        self.last_user = author
 
     async def _shutdown(self):
         await self.bot.logout()
@@ -62,13 +79,54 @@ class ModmailBot(Cog):
     async def dm(self, ctx, user : discord.User, *, msg):
         if ctx.channel.id != self.config["mail_channel"]:
             return
-        if self.config["from_field"]:
-            await user.send(f"From {ctx.author.display_name}: {msg}")
-        else:
-            await user.send(msg)
-        await ctx.message.add_reaction('📬')
 
-    @command()
+        main_guild = self.bot.get_guild(self.config["server"])
+        if not main_guild:
+            print("Main Server ID is incorrect!  Reconfigure bot!")
+            return ctx.send('Main Server Unavailable')
+        else:
+            if str(ctx.message.author.id) in config['replacements']:
+                author = main_guild.get_member(config['replacements'][str(ctx.message.author.id)])
+                if not author:
+                    author = self.bot.user
+
+                try:
+                    await ctx.message.add_reaction('🔄')
+                except:
+                    await ctx.send('🔄')
+            else:
+                author = main_guild.get_member(ctx.message.author.id)
+                if not author:
+                    author = self.bot.user
+
+        embed = discord.Embed()
+
+        if self.config["from_field"]:
+            embed.set_author(name="{} ({}#{})".format(author.display_name, author.name, author.discriminator),
+                             icon_url=author.avatar_url)
+        else:
+            embed.set_author(name="Moderator Response", icon_url=ctx.channel.guild.icon)
+
+        embed.timestamp = ctx.message.created_at
+        embed.color = author.color
+
+        embed.add_field(name="Message", value=msg[:1000] or "blank", inline=False)
+        if len(msg) > 1000:
+            embed.add_field(name="(Continued)", value=msg[1000:], inline=False)
+
+        if ctx.message.attachments:
+            embed.add_field(name="Attachments", value=", ".join([i.url for i in ctx.message.attachments]))
+
+        await user.send(embed=embed)
+
+        try:
+            await ctx.message.add_reaction('📬')
+        except:
+            await ctx.send('📬')
+
+        self.last_user = user
+
+    @command(aliases=['r'])
     async def reply(self, ctx, *, msg):
         if self.last_user is None:
             await ctx.send("No user to reply to!")
@@ -130,6 +188,6 @@ if not os.path.exists(CONFIG_PATH):
     sys.exit(1)
 
 config = read_config()
-bot = Bot(config["prefix"], description="A modmail bot.")
+bot = Bot(config["prefix"], description="A ModMail Bot.")
 bot.add_cog(ModmailBot(bot, config))
 bot.run(config["token"])
